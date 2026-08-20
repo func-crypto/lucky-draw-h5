@@ -87,6 +87,15 @@ button { font: inherit; }
 .summary-row span { display: block; color: #977568; font-size: 11px; }
 .summary-row strong { display: block; margin-top: 4px; font-size: 17px; }
 
+.activity-notice {
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  background: #fff3dc;
+  color: #8b541c;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .panel-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .panel-heading h2 { margin: 4px 0 0; font-size: 22px; }
 .section-kicker { color: #9f2f32; }
