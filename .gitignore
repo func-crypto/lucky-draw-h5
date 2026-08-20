@@ -1,21 +1,21 @@
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# Java
-backend/target/
-*.log
-
 # Node
-h5/node_modules/
+node_modules/
 h5/dist/
+
+# Runtime data
+server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Local env
 .env
 .env.local
 h5/.env.local
 
-# OS
+# Logs / IDE / OS
+*.log
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db

@@ -1,23 +1,18 @@
 # LuckyDraw H5
 
-线下活动现场使用的微信 H5 抽奖系统。
+一个面向线下活动现场的轻量微信 H5 抽奖项目。
 
-## 当前开发状态
+## V1 规则
 
-Phase 1 已进入开发：完成核心抽奖后端、固定库存奖池、同一活动同一用户仅一次、H5 移动端交互骨架、全栈 Docker 启动方案以及 CI。
-
-当前默认使用 **开发身份模式** 进行联调；微信 OAuth 会在拿到公众号 AppID / AppSecret / 网页授权域名后接入。
-
-## V1 核心规则
-
-- 微信扫码进入 H5；
-- 同一微信账号在同一活动中只能抽一次；
+- 微信扫码进入活动页；
+- 同一微信账号同一场活动只能抽一次；
 - 每次有效抽奖必中奖；
-- 奖品按剩余库存参与随机抽取；
-- 奖品库存为 0 后自动退出奖池；
-- 所有奖品抽完后停止新的抽奖；
-- 用户再次进入时展示原中奖结果；
-- 现场工作人员直接根据中奖页面发放实物，V1 暂不做核销码。
+- 奖品按“当前剩余库存”参与随机；
+- 某奖品库存为 0 后自动退出奖池；
+- 全部奖品抽完后停止新的抽奖；
+- 已抽用户再次进入时展示原中奖结果；
+- 用户现场展示中奖页面，工作人员直接发实物；
+- V1 暂不做核销码。
 
 默认奖池：
 
@@ -27,47 +22,54 @@ Phase 1 已进入开发：完成核心抽奖后端、固定库存奖池、同一
 | 二等奖 | 咖啡杯 | 50 |
 | 三等奖 | 黄麻手提袋 | 80 |
 | 幸运奖 | 小花盆 | 110 |
-| 合计 |  | 260 |
+| **合计** |  | **260** |
 
-## 技术栈
+## 技术方案
+
+刻意保持简单：
+
+```text
+Vue 3 H5
+   ↓
+Node.js API
+   ↓
+SQLite
+```
 
 - H5：Vue 3 + TypeScript + Vite
-- Backend：Java 21 + Spring Boot + Spring JDBC + Flyway
-- Database：MySQL 8.4
-- Test：JUnit 5 + H2(MySQL mode)
-- Runtime：Docker Compose + Nginx
+- 服务端：Node.js 22 + Express
+- 数据库：Node.js 内置 SQLite（单文件）
+- 生产部署：一个 Node 进程即可同时提供 API 和构建后的 H5 静态文件
 
-## 最快启动方式
+没有 Spring Boot、MySQL、Redis、微服务等额外组件。
 
-直接启动完整开发栈：
+## 目录
 
-```bash
-docker compose up --build
+```text
+lucky-draw-h5/
+├── h5/             # 用户抽奖 H5
+├── server/         # Node API + SQLite
+├── docs/           # 技术说明
+└── .github/        # CI
 ```
 
-启动完成后：
+## 本地开发
 
-- H5：`http://localhost:8088`
-- Backend：`http://localhost:8080`
-- Health：`http://localhost:8080/api/v1/health`
-- MySQL：`localhost:3306`
+要求 Node.js >= 22.5。
 
-## 分组件本地启动
-
-### 1. MySQL
+### 1. 启动服务端
 
 ```bash
-docker compose up -d mysql
+cd server
+npm install
+npm run dev
 ```
 
-### 2. Backend
+API 默认地址：`http://localhost:3000`
 
-```bash
-cd backend
-mvn spring-boot:run
-```
+### 2. 启动 H5
 
-### 3. H5
+另开终端：
 
 ```bash
 cd h5
@@ -75,41 +77,47 @@ npm install
 npm run dev
 ```
 
-默认页面：`http://localhost:5173`，Vite 会把 `/api` 代理到 `http://localhost:8080`。
+H5 默认地址：`http://localhost:5173`
 
-## 开发身份模式
+Vite 会把 `/api` 代理到 `http://localhost:3000`。
 
-微信 OAuth 尚未配置时，H5 会在浏览器本地生成一个 `dev-*` 身份，通过 `X-User-OpenId` 请求头调用后端。该模式只用于本地/验收联调，不能作为正式上线的一人一次依据。
+## 测试
 
-正式环境将切换到微信网页授权，由服务端可信会话提供 OpenID，不接受前端自行伪造身份。
+服务端核心抽奖测试不依赖外部数据库：
 
-## 主要 API
+```bash
+cd server
+npm test
+```
 
-- `GET /api/v1/health`：服务健康状态
-- `GET /api/v1/activities/{slug}`：活动与奖池状态
-- `GET /api/v1/activities/{slug}/me`：当前用户中奖记录
-- `POST /api/v1/activities/{slug}/draw`：抽奖
+当前覆盖：
 
-联调阶段 `me/draw` 需要请求头：
+- 同一用户重复请求只消耗一份奖品；
+- 260 个不同用户可将 260 份库存精确抽完；
+- 库存耗尽后拒绝第 261 次新抽奖。
+
+## 当前开发身份模式
+
+正式微信 OAuth 所需的公众号 AppID、AppSecret、网页授权域名尚未提供，因此当前联调阶段通过请求头模拟 OpenID：
 
 ```text
 X-User-OpenId: dev-user-001
 ```
 
-## 目录
+H5 在开发模式下会自动为浏览器生成一个 `dev-*` 身份。
 
-```text
-lucky-draw-h5/
-├── backend/        # Spring Boot API
-├── h5/             # 微信 H5 + Nginx
-├── docs/           # 产品与技术说明
-└── docker-compose.yml
-```
+正式接入微信 OAuth 时，只替换服务端身份获取这一层，抽奖和库存逻辑无需重写。
+
+## API
+
+- `GET /api/health`
+- `GET /api/v1/activities/{slug}`
+- `GET /api/v1/activities/{slug}/me`
+- `POST /api/v1/activities/{slug}/draw`
 
 ## 下一步
 
-1. 接入微信 OAuth / 服务端会话；
-2. 完成活动后台与奖品配置；
-3. 加入正式活动视觉素材和更完整抽奖动画；
-4. 增加后台统计、导出与库存操作审计；
-5. 真机微信环境联调和上线部署。
+1. 完善 H5 抽奖动效与活动素材；
+2. 做一个极简管理页查看库存和中奖记录；
+3. 拿到公众号配置后接微信 OAuth；
+4. 最后做微信真机联调和上线。
