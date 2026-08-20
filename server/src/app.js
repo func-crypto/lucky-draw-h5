@@ -2,6 +2,7 @@ import express from 'express'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { getActivity, getMyResult, drawPrize, LotteryError } from './lottery.js'
+import { getAdminStats, listDraws } from './admin.js'
 
 const defaultH5Dist = fileURLToPath(new URL('../../h5/dist', import.meta.url))
 
@@ -42,6 +43,28 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
     }
   })
 
+  app.get('/api/admin/:slug/stats', (req, res, next) => {
+    try {
+      requireAdmin(req)
+      const stats = getAdminStats(db, req.params.slug)
+      if (!stats) {
+        return res.status(404).json({ code: 'ACTIVITY_NOT_FOUND', message: '活动不存在' })
+      }
+      return res.json(stats)
+    } catch (error) {
+      return next(error)
+    }
+  })
+
+  app.get('/api/admin/:slug/draws', (req, res, next) => {
+    try {
+      requireAdmin(req)
+      return res.json({ items: listDraws(db, req.params.slug, req.query.limit) })
+    } catch (error) {
+      return next(error)
+    }
+  })
+
   if (existsSync(h5Dist)) {
     app.use(express.static(h5Dist))
     app.get('*', (req, res, next) => {
@@ -73,4 +96,13 @@ function requireIdentity(req) {
     throw new LotteryError('IDENTITY_REQUIRED', '请先完成微信身份授权', 401)
   }
   return openid
+}
+
+function requireAdmin(req) {
+  const configuredKey = process.env.ADMIN_KEY || (process.env.NODE_ENV === 'production' ? '' : 'dev-admin')
+  const providedKey = req.get('X-Admin-Key')?.trim()
+
+  if (!configuredKey || !providedKey || providedKey !== configuredKey) {
+    throw new LotteryError('ADMIN_UNAUTHORIZED', '管理员口令不正确', 401)
+  }
 }
