@@ -1,4 +1,4 @@
-import type { ActivityView, DrawResult } from './types'
+import type { ActivityView, AdminDrawRecord, AdminStats, DrawResult } from './types'
 
 const apiBase = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 export const activitySlug = import.meta.env.VITE_ACTIVITY_SLUG || 'demo'
@@ -40,4 +40,19 @@ export async function drawPrize(openid: string): Promise<DrawResult> {
   })
   if (!data) throw new Error('抽奖结果为空')
   return data
+}
+
+export async function getAdminStats(adminKey: string): Promise<AdminStats> {
+  const data = await request<AdminStats>(`/api/admin/${activitySlug}/stats`, {
+    headers: { 'X-Admin-Key': adminKey },
+  })
+  if (!data) throw new Error('后台数据为空')
+  return data
+}
+
+export async function getAdminDraws(adminKey: string): Promise<AdminDrawRecord[]> {
+  const data = await request<{ items: AdminDrawRecord[] }>(`/api/admin/${activitySlug}/draws?limit=300`, {
+    headers: { 'X-Admin-Key': adminKey },
+  })
+  return data?.items || []
 }
