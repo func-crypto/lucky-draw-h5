@@ -12,6 +12,7 @@ server/data/
 .env
 .env.local
 h5/.env.local
+h5/.env.production
 
 # Logs / IDE / OS
 *.log
