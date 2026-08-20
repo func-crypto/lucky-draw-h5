@@ -39,15 +39,16 @@ SQLite
 - H5：Vue 3 + TypeScript + Vite
 - 服务端：Node.js 22 + Express
 - 数据库：Node.js 内置 SQLite（单文件）
+- 微信登录：公众号网页 OAuth + 服务端签名 HttpOnly Cookie
 - 生产部署：一个 Node 进程同时提供 API、用户 H5 和后台
-- 不使用 Spring Boot、MySQL、Redis、微服务等额外组件
+- 不使用 Spring Boot、MySQL、Redis、微服务或独立 Session 服务
 
 ## 目录
 
 ```text
 lucky-draw-h5/
 ├── h5/             # 用户抽奖 H5 + 极简后台
-├── server/         # Node API + SQLite
+├── server/         # Node API + SQLite + 微信 OAuth
 ├── docs/           # 架构与部署说明
 ├── package.json    # 根目录统一命令
 └── .github/        # CI
@@ -93,6 +94,36 @@ npm run start     # 启动服务端
 npm run start:env # 读取 server/.env 后启动生产服务
 ```
 
+## 微信登录
+
+微信 OAuth 主链已经实现，不需要等拿到公众号参数后再写代码。
+
+正式模式流程：
+
+```text
+微信扫码
+  ↓
+H5 请求当前用户结果
+  ↓
+未登录返回 IDENTITY_REQUIRED
+  ↓
+自动跳转 /auth/wechat
+  ↓
+公众号 snsapi_base 静默授权
+  ↓
+/auth/wechat/callback 换取 OpenID
+  ↓
+服务端写入签名 HttpOnly Cookie
+  ↓
+返回活动页
+  ↓
+以 OpenID 执行“一微信一次”
+```
+
+签名 Cookie 只保存经过服务端签名的会话信息，AppSecret 和 Session Secret 不进入前端。
+
+当前因为还没有正式公众号 AppID / AppSecret / 授权域名，默认仍使用 `dev` 身份模式联调。拿到参数后只需填写环境变量并把 H5 构建模式切换为 `wechat`。
+
 ## 极简管理页
 
 `/admin` 当前包含现场真正需要的能力：
@@ -112,22 +143,31 @@ npm run start:env # 读取 server/.env 后启动生产服务
 
 ## 生产配置
 
-复制：
+H5：
+
+```bash
+cp h5/.env.production.example h5/.env.production
+```
+
+服务端：
 
 ```bash
 cp server/.env.example server/.env
 ```
 
-至少修改：
+正式服务端关键配置：
 
 ```text
 NODE_ENV=production
+IDENTITY_MODE=wechat
 ADMIN_KEY=替换成正式随机强口令
 DATA_FILE=./data/lucky-draw.sqlite
 PORT=3000
+PUBLIC_BASE_URL=https://你的正式域名
+WECHAT_APP_ID=公众号 AppID
+WECHAT_APP_SECRET=公众号 AppSecret
+SESSION_SECRET=随机强会话签名密钥
 ```
-
-生产环境没有配置有效 `ADMIN_KEY` 时，后台接口不可登录。
 
 完整部署步骤见：`docs/deploy.md`。
 
@@ -144,21 +184,17 @@ npm run test
 - 库存耗尽后拒绝第 261 次新抽奖；
 - 后台参与人数、已抽库存与中奖记录保持一致；
 - 后台中奖记录不会返回完整 OpenID；
-- CSV 导出包含中文表头和中奖记录，并保持 OpenID 脱敏。
-
-## 当前开发身份模式
-
-正式微信 OAuth 所需的公众号 AppID、AppSecret、网页授权域名尚未提供，因此当前联调阶段通过请求头模拟 OpenID：
-
-```text
-X-User-OpenId: dev-user-001
-```
-
-H5 在开发模式下会自动为浏览器生成一个 `dev-*` 身份。
-
-正式接入微信 OAuth 时，只替换服务端身份获取这一层，抽奖和库存逻辑无需重写。
+- CSV 导出包含中文表头和中奖记录，并保持 OpenID 脱敏；
+- OAuth state 签名和篡改检测；
+- HttpOnly 用户会话签名、过期和错误密钥检测；
+- 微信授权 URL 和 code→OpenID 网络调用逻辑（使用 mock，不依赖真实微信）。
 
 ## API
+
+身份：
+
+- `GET /auth/wechat`
+- `GET /auth/wechat/callback`
 
 用户端：
 
@@ -178,6 +214,6 @@ H5 在开发模式下会自动为浏览器生成一个 `dev-*` 身份。
 ## 当前剩余事项
 
 1. 根据客户最终素材继续收 H5 视觉；
-2. 拿到公众号配置后接微信 OAuth；
-3. 微信真机联调与正式 HTTPS 上线；
+2. 拿到公众号参数后填配置并进行微信真机 OAuth 验证；
+3. 正式 HTTPS 上线；
 4. 是否增加“已领取”状态，等待业务最终确认。
