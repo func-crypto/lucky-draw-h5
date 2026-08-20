@@ -103,6 +103,18 @@ function prizeEmoji(prize: PrizeView | DrawResult): string {
   return '🎁'
 }
 
+function formatResultTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
 function delay(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
@@ -193,6 +205,10 @@ function toMessage(error: unknown): string {
         <div class="result-prize">
           <span>{{ result.prizeLevel }}</span>
           <strong>{{ result.prizeName }}</strong>
+        </div>
+        <div class="result-meta">
+          <span>中奖记录 #{{ result.drawId }}</span>
+          <span>{{ formatResultTime(result.drawnAt) }}</span>
         </div>
         <p class="claim-tip">请向现场工作人员出示本页面领取奖品</p>
         <p v-if="result.replayed" class="replayed-tip">您已经参与过本次活动，这是您的原中奖结果。</p>
