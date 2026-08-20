@@ -2,7 +2,7 @@ import express from 'express'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { getActivity, getMyResult, drawPrize, LotteryError } from './lottery.js'
-import { getAdminStats, listDraws } from './admin.js'
+import { exportDrawsCsv, getAdminStats, listDraws } from './admin.js'
 
 const defaultH5Dist = fileURLToPath(new URL('../../h5/dist', import.meta.url))
 
@@ -25,6 +25,7 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
 
   app.get('/api/v1/activities/:slug/me', (req, res, next) => {
     try {
+      res.set('Cache-Control', 'no-store')
       const openid = requireIdentity(req)
       const result = getMyResult(db, req.params.slug, openid)
       if (!result) return res.status(204).end()
@@ -36,6 +37,7 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
 
   app.post('/api/v1/activities/:slug/draw', (req, res, next) => {
     try {
+      res.set('Cache-Control', 'no-store')
       const openid = requireIdentity(req)
       return res.json(drawPrize(db, req.params.slug, openid))
     } catch (error) {
@@ -45,6 +47,7 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
 
   app.get('/api/admin/:slug/stats', (req, res, next) => {
     try {
+      res.set('Cache-Control', 'no-store')
       requireAdmin(req)
       const stats = getAdminStats(db, req.params.slug)
       if (!stats) {
@@ -58,8 +61,26 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
 
   app.get('/api/admin/:slug/draws', (req, res, next) => {
     try {
+      res.set('Cache-Control', 'no-store')
       requireAdmin(req)
       return res.json({ items: listDraws(db, req.params.slug, req.query.limit) })
+    } catch (error) {
+      return next(error)
+    }
+  })
+
+  app.get('/api/admin/:slug/draws.csv', (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store')
+      requireAdmin(req)
+      const stats = getAdminStats(db, req.params.slug)
+      if (!stats) {
+        return res.status(404).json({ code: 'ACTIVITY_NOT_FOUND', message: '活动不存在' })
+      }
+
+      res.type('text/csv; charset=utf-8')
+      res.set('Content-Disposition', `attachment; filename="${req.params.slug}-draws.csv"`)
+      return res.send(exportDrawsCsv(db, req.params.slug))
     } catch (error) {
       return next(error)
     }
