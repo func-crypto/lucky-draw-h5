@@ -47,7 +47,7 @@ SQLite
 
 ```text
 lucky-draw-h5/
-├── h5/             # 用户抽奖 H5
+├── h5/             # 用户抽奖 H5 + 极简后台
 ├── server/         # Node API + SQLite
 ├── docs/           # 技术说明
 └── .github/        # CI
@@ -77,13 +77,40 @@ npm install
 npm run dev
 ```
 
-H5 默认地址：`http://localhost:5173`
+用户页：`http://localhost:5173`
+
+管理页：`http://localhost:5173/admin`
 
 Vite 会把 `/api` 代理到 `http://localhost:3000`。
 
+## 极简管理页
+
+管理页目前只做现场真正需要的数据查看：
+
+- 参与人数；
+- 已抽/剩余/总奖品数；
+- 四种奖品各自库存；
+- 活动消耗进度；
+- 最近中奖记录。
+
+开发环境默认管理员口令：
+
+```text
+dev-admin
+```
+
+正式部署必须设置环境变量：
+
+```bash
+ADMIN_KEY=替换成正式管理员口令
+NODE_ENV=production
+```
+
+生产环境没有配置 `ADMIN_KEY` 时，后台接口默认不可登录。
+
 ## 测试
 
-服务端核心抽奖测试不依赖外部数据库：
+服务端核心测试不依赖外部数据库：
 
 ```bash
 cd server
@@ -94,7 +121,9 @@ npm test
 
 - 同一用户重复请求只消耗一份奖品；
 - 260 个不同用户可将 260 份库存精确抽完；
-- 库存耗尽后拒绝第 261 次新抽奖。
+- 库存耗尽后拒绝第 261 次新抽奖；
+- 后台参与人数、已抽库存与中奖记录保持一致；
+- 后台中奖记录不会返回完整 OpenID。
 
 ## 当前开发身份模式
 
@@ -110,14 +139,23 @@ H5 在开发模式下会自动为浏览器生成一个 `dev-*` 身份。
 
 ## API
 
+用户端：
+
 - `GET /api/health`
 - `GET /api/v1/activities/{slug}`
 - `GET /api/v1/activities/{slug}/me`
 - `POST /api/v1/activities/{slug}/draw`
 
-## 下一步
+管理端：
 
-1. 完善 H5 抽奖动效与活动素材；
-2. 做一个极简管理页查看库存和中奖记录；
-3. 拿到公众号配置后接微信 OAuth；
-4. 最后做微信真机联调和上线。
+- `GET /api/admin/{slug}/stats`
+- `GET /api/admin/{slug}/draws`
+
+管理端请求使用 `X-Admin-Key` 请求头。
+
+## 当前剩余事项
+
+1. 根据客户最终素材继续收 H5 视觉；
+2. 拿到公众号配置后接微信 OAuth；
+3. 微信真机联调与线上 HTTPS 部署；
+4. 是否增加“已领取”状态，等待业务最终确认。
