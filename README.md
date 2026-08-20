@@ -4,7 +4,7 @@
 
 ## 当前开发状态
 
-Phase 1 已进入开发：完成核心抽奖后端、固定库存奖池、同一活动同一用户仅一次、H5 移动端交互骨架以及 CI。
+Phase 1 已进入开发：完成核心抽奖后端、固定库存奖池、同一活动同一用户仅一次、H5 移动端交互骨架、全栈 Docker 启动方案以及 CI。
 
 当前默认使用 **开发身份模式** 进行联调；微信 OAuth 会在拿到公众号 AppID / AppSecret / 网页授权域名后接入。
 
@@ -35,8 +35,24 @@ Phase 1 已进入开发：完成核心抽奖后端、固定库存奖池、同一
 - Backend：Java 21 + Spring Boot + Spring JDBC + Flyway
 - Database：MySQL 8.4
 - Test：JUnit 5 + H2(MySQL mode)
+- Runtime：Docker Compose + Nginx
 
-## 本地启动
+## 最快启动方式
+
+直接启动完整开发栈：
+
+```bash
+docker compose up --build
+```
+
+启动完成后：
+
+- H5：`http://localhost:8088`
+- Backend：`http://localhost:8080`
+- Health：`http://localhost:8080/api/v1/health`
+- MySQL：`localhost:3306`
+
+## 分组件本地启动
 
 ### 1. MySQL
 
@@ -51,8 +67,6 @@ cd backend
 mvn spring-boot:run
 ```
 
-默认 API：`http://localhost:8080`
-
 ### 3. H5
 
 ```bash
@@ -61,9 +75,7 @@ npm install
 npm run dev
 ```
 
-默认页面：`http://localhost:5173`
-
-Vite 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
+默认页面：`http://localhost:5173`，Vite 会把 `/api` 代理到 `http://localhost:8080`。
 
 ## 开发身份模式
 
@@ -73,6 +85,7 @@ Vite 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
 
 ## 主要 API
 
+- `GET /api/v1/health`：服务健康状态
 - `GET /api/v1/activities/{slug}`：活动与奖池状态
 - `GET /api/v1/activities/{slug}/me`：当前用户中奖记录
 - `POST /api/v1/activities/{slug}/draw`：抽奖
@@ -88,7 +101,7 @@ X-User-OpenId: dev-user-001
 ```text
 lucky-draw-h5/
 ├── backend/        # Spring Boot API
-├── h5/             # 微信 H5
+├── h5/             # 微信 H5 + Nginx
 ├── docs/           # 产品与技术说明
 └── docker-compose.yml
 ```
@@ -97,6 +110,6 @@ lucky-draw-h5/
 
 1. 接入微信 OAuth / 服务端会话；
 2. 完成活动后台与奖品配置；
-3. 加入正式活动视觉素材和抽奖动画；
+3. 加入正式活动视觉素材和更完整抽奖动画；
 4. 增加后台统计、导出与库存操作审计；
 5. 真机微信环境联调和上线部署。
