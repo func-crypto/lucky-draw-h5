@@ -39,9 +39,8 @@ SQLite
 - H5：Vue 3 + TypeScript + Vite
 - 服务端：Node.js 22 + Express
 - 数据库：Node.js 内置 SQLite（单文件）
-- 生产部署：一个 Node 进程即可同时提供 API 和构建后的 H5 静态文件
-
-没有 Spring Boot、MySQL、Redis、微服务等额外组件。
+- 生产部署：一个 Node 进程同时提供 API、用户 H5 和后台
+- 不使用 Spring Boot、MySQL、Redis、微服务等额外组件
 
 ## 目录
 
@@ -49,31 +48,32 @@ SQLite
 lucky-draw-h5/
 ├── h5/             # 用户抽奖 H5 + 极简后台
 ├── server/         # Node API + SQLite
-├── docs/           # 技术说明
+├── docs/           # 架构与部署说明
+├── package.json    # 根目录统一命令
 └── .github/        # CI
 ```
 
-## 本地开发
+## 最简单的本地启动
 
 要求 Node.js >= 22.5。
 
-### 1. 启动服务端
+先安装全部依赖：
+
+```bash
+npm run setup
+```
+
+终端 1：
 
 ```bash
 cd server
-npm install
 npm run dev
 ```
 
-API 默认地址：`http://localhost:3000`
-
-### 2. 启动 H5
-
-另开终端：
+终端 2：
 
 ```bash
 cd h5
-npm install
 npm run dev
 ```
 
@@ -81,11 +81,21 @@ npm run dev
 
 管理页：`http://localhost:5173/admin`
 
-Vite 会把 `/api` 代理到 `http://localhost:3000`。
+开发环境默认管理员口令：`dev-admin`
+
+## 根目录统一命令
+
+```bash
+npm run setup     # 安装 server + h5 依赖
+npm run test      # 服务端测试 + H5 类型检查/构建
+npm run build     # 构建 H5
+npm run start     # 启动服务端
+npm run start:env # 读取 server/.env 后启动生产服务
+```
 
 ## 极简管理页
 
-管理页目前只做现场真正需要的数据查看和导出：
+`/admin` 当前包含现场真正需要的能力：
 
 - 参与人数；
 - 已抽/剩余/总奖品数；
@@ -93,32 +103,38 @@ Vite 会把 `/api` 代理到 `http://localhost:3000`。
 - 活动消耗进度；
 - 最近中奖记录；
 - 按微信用户、奖项、奖品快速搜索；
-- 一键导出 CSV，可直接使用 Excel 打开。
+- 一键导出 CSV，可直接使用 Excel 打开；
+- 自动生成当前正式域名的现场活动二维码；
+- 复制活动链接；
+- 下载二维码 PNG 供现场打印。
 
-开发环境默认管理员口令：
+后台页面和 CSV 中的 OpenID 只展示脱敏值，不直接暴露完整用户标识。
 
-```text
-dev-admin
-```
+## 生产配置
 
-正式部署必须设置环境变量：
+复制：
 
 ```bash
-ADMIN_KEY=替换成正式管理员口令
-NODE_ENV=production
+cp server/.env.example server/.env
 ```
 
-生产环境没有配置 `ADMIN_KEY` 时，后台接口默认不可登录。
+至少修改：
 
-后台页面和 CSV 中的 OpenID 都只展示脱敏值，不直接暴露完整用户标识。
+```text
+NODE_ENV=production
+ADMIN_KEY=替换成正式随机强口令
+DATA_FILE=./data/lucky-draw.sqlite
+PORT=3000
+```
+
+生产环境没有配置有效 `ADMIN_KEY` 时，后台接口不可登录。
+
+完整部署步骤见：`docs/deploy.md`。
 
 ## 测试
 
-服务端核心测试不依赖外部数据库：
-
 ```bash
-cd server
-npm test
+npm run test
 ```
 
 当前覆盖：
@@ -163,5 +179,5 @@ H5 在开发模式下会自动为浏览器生成一个 `dev-*` 身份。
 
 1. 根据客户最终素材继续收 H5 视觉；
 2. 拿到公众号配置后接微信 OAuth；
-3. 微信真机联调与线上 HTTPS 部署；
+3. 微信真机联调与正式 HTTPS 上线；
 4. 是否增加“已领取”状态，等待业务最终确认。
