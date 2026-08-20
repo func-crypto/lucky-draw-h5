@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import QRCode from 'qrcode'
 import { getAdminDraws, getAdminDrawsCsv, getAdminStats } from './api'
 import type { AdminDrawRecord, AdminStats } from './types'
 
@@ -11,6 +12,9 @@ const draws = ref<AdminDrawRecord[]>([])
 const searchText = ref('')
 const loading = ref(false)
 const exportLoading = ref(false)
+const qrLoading = ref(false)
+const qrCodeDataUrl = ref('')
+const linkMessage = ref('')
 const errorMessage = ref('')
 const previousBodyBackground = document.body.style.background
 const previousBodyPadding = document.body.style.padding
@@ -29,9 +33,13 @@ const filteredDraws = computed(() => {
   )
 })
 
+const activityUrl = computed(() => new URL('/', window.location.origin).toString())
+const isLocalAddress = computed(() => ['localhost', '127.0.0.1'].includes(window.location.hostname))
+
 onMounted(() => {
   document.body.style.background = '#f5eee5'
   document.body.style.padding = '0'
+  void generateQrCode()
   if (adminKey.value) void loadDashboard()
 })
 
@@ -92,6 +100,42 @@ async function exportCsv() {
   }
 }
 
+async function generateQrCode() {
+  qrLoading.value = true
+  try {
+    qrCodeDataUrl.value = await QRCode.toDataURL(activityUrl.value, {
+      width: 360,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
+  } catch (error) {
+    console.error(error)
+    qrCodeDataUrl.value = ''
+  } finally {
+    qrLoading.value = false
+  }
+}
+
+async function copyActivityUrl() {
+  try {
+    await navigator.clipboard.writeText(activityUrl.value)
+    linkMessage.value = '活动链接已复制'
+  } catch {
+    linkMessage.value = '复制失败，请手动复制链接'
+  }
+  window.setTimeout(() => { linkMessage.value = '' }, 1800)
+}
+
+function downloadQrCode() {
+  if (!qrCodeDataUrl.value) return
+  const link = document.createElement('a')
+  link.href = qrCodeDataUrl.value
+  link.download = 'lucky-draw-activity-qr.png'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 function logout() {
   window.localStorage.removeItem(keyStorage)
   adminKey.value = ''
@@ -150,6 +194,30 @@ function formatTime(value: string) {
         <em>{{ stats.status === 'ACTIVE' ? '进行中' : '已结束' }}</em>
       </section>
 
+      <section class="panel admin-entry">
+        <div class="entry-copy">
+          <span class="entry-kicker">ON-SITE ENTRY</span>
+          <h2>现场活动二维码</h2>
+          <p>将二维码下载后打印放在活动现场，参与者用微信扫一扫即可进入抽奖页。</p>
+          <div class="entry-url">
+            <code>{{ activityUrl }}</code>
+            <button class="admin-ghost" @click="copyActivityUrl">复制链接</button>
+          </div>
+          <small :class="{ warning: isLocalAddress }">
+            {{ isLocalAddress ? '当前是本地预览地址，上线正式域名后二维码会自动切换为正式活动地址。' : '当前二维码已经指向正式活动入口，可直接下载打印。' }}
+          </small>
+          <span v-if="linkMessage" class="link-message">{{ linkMessage }}</span>
+        </div>
+        <div class="qr-panel">
+          <div class="qr-box">
+            <span v-if="qrLoading">生成中…</span>
+            <img v-else-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="现场活动二维码" />
+            <span v-else>二维码生成失败</span>
+          </div>
+          <button class="admin-primary" :disabled="!qrCodeDataUrl" @click="downloadQrCode">下载二维码 PNG</button>
+        </div>
+      </section>
+
       <section class="admin-metrics">
         <article><span>参与人数</span><strong>{{ stats.participantCount }}</strong></article>
         <article><span>已抽出</span><strong>{{ stats.drawnStock }}</strong></article>
@@ -206,5 +274,5 @@ function formatTime(value: string) {
 </template>
 
 <style scoped>
-.admin-shell{width:min(1100px,calc(100% - 32px));margin:0 auto;padding:36px 0 70px;color:#2b1b18}.admin-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.admin-header h1{margin:6px 0 0;font-size:30px}.admin-actions{display:flex;flex-wrap:wrap;gap:8px}.admin-secondary,.admin-ghost,.admin-primary{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer}.admin-secondary,.admin-primary{background:#7d1e24;color:#fff}.admin-secondary:disabled,.admin-primary:disabled{opacity:.55;cursor:default}.admin-ghost{background:#eadfd4;color:#6d4b3d}.admin-login{max-width:460px;margin:80px auto 0}.admin-login h2{margin:0 0 8px}.admin-login>p{color:#816b60}.admin-login form{display:grid;gap:10px;margin-top:22px}.admin-login input,.record-tools input{min-height:48px;border:1px solid #dfd0c2;border-radius:12px;padding:0 14px;font:inherit;background:#fff;outline:none}.admin-login input:focus,.record-tools input:focus{border-color:#9f6567;box-shadow:0 0 0 3px rgba(125,30,36,.08)}.admin-dev-tip{display:block;margin-top:16px;color:#a58c7d;line-height:1.6}.admin-titlebar{display:flex;justify-content:space-between;align-items:center;padding:20px 22px;border-radius:20px;background:#701b22;color:#fff7e8;margin-bottom:14px}.admin-titlebar span{display:block;font-size:11px;opacity:.7}.admin-titlebar strong{display:block;margin-top:4px;font-size:20px}.admin-titlebar em{font-style:normal;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.12);font-size:12px}.admin-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.admin-metrics article{padding:18px;border-radius:18px;background:#fffaf1;border:1px solid rgba(100,57,31,.09)}.admin-metrics span{display:block;color:#96786a;font-size:12px}.admin-metrics strong{display:block;margin-top:6px;font-size:28px}.admin-section,.admin-progress{margin-top:14px}.admin-section-heading{display:flex;align-items:end;justify-content:space-between;gap:16px}.admin-section-heading span{display:block;color:#a13c37;font-size:11px;font-weight:800;letter-spacing:.12em}.admin-section-heading strong{display:block;margin-top:4px;font-size:20px}.admin-section-heading small{color:#9a8174}.progress-track,.mini-track{overflow:hidden;border-radius:999px;background:#eadfd4}.progress-track{height:10px;margin-top:16px}.progress-track i,.mini-track i{display:block;height:100%;background:linear-gradient(90deg,#a32c31,#d6a14c);transition:width .25s ease}.admin-prize-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:18px}.admin-prize-list article{position:relative;padding:16px;border-radius:16px;background:#fbf4ea;border:1px solid #eadbc9}.admin-prize-list span{display:block;color:#a13c37;font-size:11px}.admin-prize-list strong{display:block;margin-top:3px}.admin-stock-numbers{position:absolute;right:16px;top:14px;text-align:right}.admin-stock-numbers b{display:block;font-size:20px}.admin-stock-numbers small{color:#9a8174}.mini-track{height:6px;margin-top:14px}.record-tools{display:grid;grid-template-columns:minmax(220px,360px) 1fr;align-items:center;gap:14px;margin-top:16px}.record-tools input{min-height:42px}.record-tools span{color:#9a8174;font-size:11px}.draw-table-wrap{overflow:auto;margin-top:14px;border:1px solid #eadbc9;border-radius:14px}.draw-table{width:100%;border-collapse:collapse;min-width:620px;background:#fffdf9}.draw-table th,.draw-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #eee2d6;font-size:12px;white-space:nowrap}.draw-table th{color:#876e61;background:#f8efe5;position:sticky;top:0}.draw-table tr:last-child td{border-bottom:0}.admin-empty{padding:28px 0 10px;text-align:center;color:#9a8174}@media(max-width:700px){.admin-shell{width:min(100% - 24px,1100px);padding-top:24px}.admin-header{align-items:flex-start;flex-direction:column}.admin-header h1{font-size:24px}.admin-actions{width:100%}.admin-actions button{flex:1}.admin-metrics{grid-template-columns:repeat(2,1fr)}.admin-prize-list{grid-template-columns:1fr}.admin-login{margin-top:40px}.record-heading{align-items:flex-start}.record-tools{grid-template-columns:1fr;gap:7px}}
+.admin-shell{width:min(1100px,calc(100% - 32px));margin:0 auto;padding:36px 0 70px;color:#2b1b18}.admin-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.admin-header h1{margin:6px 0 0;font-size:30px}.admin-actions{display:flex;flex-wrap:wrap;gap:8px}.admin-secondary,.admin-ghost,.admin-primary{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer}.admin-secondary,.admin-primary{background:#7d1e24;color:#fff}.admin-secondary:disabled,.admin-primary:disabled{opacity:.55;cursor:default}.admin-ghost{background:#eadfd4;color:#6d4b3d}.admin-login{max-width:460px;margin:80px auto 0}.admin-login h2{margin:0 0 8px}.admin-login>p{color:#816b60}.admin-login form{display:grid;gap:10px;margin-top:22px}.admin-login input,.record-tools input{min-height:48px;border:1px solid #dfd0c2;border-radius:12px;padding:0 14px;font:inherit;background:#fff;outline:none}.admin-login input:focus,.record-tools input:focus{border-color:#9f6567;box-shadow:0 0 0 3px rgba(125,30,36,.08)}.admin-dev-tip{display:block;margin-top:16px;color:#a58c7d;line-height:1.6}.admin-titlebar{display:flex;justify-content:space-between;align-items:center;padding:20px 22px;border-radius:20px;background:#701b22;color:#fff7e8;margin-bottom:14px}.admin-titlebar span{display:block;font-size:11px;opacity:.7}.admin-titlebar strong{display:block;margin-top:4px;font-size:20px}.admin-titlebar em{font-style:normal;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.12);font-size:12px}.admin-entry{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:26px;align-items:center;margin-bottom:14px}.entry-kicker{display:block;color:#a13c37;font-size:11px;font-weight:800;letter-spacing:.12em}.entry-copy h2{margin:5px 0 8px;font-size:22px}.entry-copy p{margin:0;color:#7f695f;line-height:1.7}.entry-url{display:flex;align-items:center;gap:8px;margin-top:16px}.entry-url code{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:11px 13px;border:1px solid #e5d7ca;border-radius:12px;background:#fbf4ea;color:#63483d;font-size:12px}.entry-copy small{display:block;margin-top:9px;color:#8e766a;line-height:1.6}.entry-copy small.warning{color:#a05d18}.link-message{display:inline-block;margin-top:8px;color:#7d1e24;font-size:12px;font-weight:800}.qr-panel{display:grid;gap:10px}.qr-box{display:grid;place-items:center;aspect-ratio:1;border:1px solid #e4d7ca;border-radius:18px;background:#fff;color:#9a8174;font-size:12px;overflow:hidden}.qr-box img{display:block;width:100%;height:100%;object-fit:contain;padding:10px}.admin-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.admin-metrics article{padding:18px;border-radius:18px;background:#fffaf1;border:1px solid rgba(100,57,31,.09)}.admin-metrics span{display:block;color:#96786a;font-size:12px}.admin-metrics strong{display:block;margin-top:6px;font-size:28px}.admin-section,.admin-progress{margin-top:14px}.admin-section-heading{display:flex;align-items:end;justify-content:space-between;gap:16px}.admin-section-heading span{display:block;color:#a13c37;font-size:11px;font-weight:800;letter-spacing:.12em}.admin-section-heading strong{display:block;margin-top:4px;font-size:20px}.admin-section-heading small{color:#9a8174}.progress-track,.mini-track{overflow:hidden;border-radius:999px;background:#eadfd4}.progress-track{height:10px;margin-top:16px}.progress-track i,.mini-track i{display:block;height:100%;background:linear-gradient(90deg,#a32c31,#d6a14c);transition:width .25s ease}.admin-prize-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:18px}.admin-prize-list article{position:relative;padding:16px;border-radius:16px;background:#fbf4ea;border:1px solid #eadbc9}.admin-prize-list span{display:block;color:#a13c37;font-size:11px}.admin-prize-list strong{display:block;margin-top:3px}.admin-stock-numbers{position:absolute;right:16px;top:14px;text-align:right}.admin-stock-numbers b{display:block;font-size:20px}.admin-stock-numbers small{color:#9a8174}.mini-track{height:6px;margin-top:14px}.record-tools{display:grid;grid-template-columns:minmax(220px,360px) 1fr;align-items:center;gap:14px;margin-top:16px}.record-tools input{min-height:42px}.record-tools span{color:#9a8174;font-size:11px}.draw-table-wrap{overflow:auto;margin-top:14px;border:1px solid #eadbc9;border-radius:14px}.draw-table{width:100%;border-collapse:collapse;min-width:620px;background:#fffdf9}.draw-table th,.draw-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #eee2d6;font-size:12px;white-space:nowrap}.draw-table th{color:#876e61;background:#f8efe5;position:sticky;top:0}.draw-table tr:last-child td{border-bottom:0}.admin-empty{padding:28px 0 10px;text-align:center;color:#9a8174}@media(max-width:700px){.admin-shell{width:min(100% - 24px,1100px);padding-top:24px}.admin-header{align-items:flex-start;flex-direction:column}.admin-header h1{font-size:24px}.admin-actions{width:100%}.admin-actions button{flex:1}.admin-entry{grid-template-columns:1fr}.qr-panel{max-width:220px}.entry-url{align-items:stretch;flex-direction:column}.admin-metrics{grid-template-columns:repeat(2,1fr)}.admin-prize-list{grid-template-columns:1fr}.admin-login{margin-top:40px}.record-heading{align-items:flex-start}.record-tools{grid-template-columns:1fr;gap:7px}}
 </style>
