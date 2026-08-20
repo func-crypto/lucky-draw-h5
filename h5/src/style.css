@@ -169,6 +169,7 @@ button { font: inherit; }
 .result-prize { display: inline-flex; flex-direction: column; gap: 4px; padding: 12px 24px; border: 1px solid rgba(255,236,194,.28); border-radius: 16px; background: rgba(255,255,255,.06); }
 .result-prize span { color: #ffd893; font-size: 13px; }
 .result-prize strong { font-size: 22px; }
+.result-meta { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; color: #dfcdbd; font-size: 10px; }
 .claim-tip { margin: 18px 0 0; font-size: 13px; }
 .replayed-tip { margin: 9px 0 0; color: #dfcdbd; font-size: 11px; }
 
