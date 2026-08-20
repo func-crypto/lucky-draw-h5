@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import AdminView from './AdminView.vue'
-import { activitySlug, drawPrize, getActivity, getMyResult } from './api'
+import { ApiError, activitySlug, drawPrize, getActivity, getMyResult, identityMode } from './api'
 import type { ActivityView, DrawResult, PrizeView } from './types'
 
 const isAdmin = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
@@ -13,7 +13,6 @@ const activePrizeId = ref<number | null>(null)
 const errorMessage = ref('')
 const showRules = ref(false)
 
-const identityMode = import.meta.env.VITE_IDENTITY_MODE || 'dev'
 const isDevIdentity = identityMode === 'dev'
 const openid = isAdmin ? '' : resolveIdentity()
 
@@ -45,6 +44,7 @@ onMounted(async () => {
     result.value = await getMyResult(openid)
     if (result.value) activePrizeId.value = result.value.prizeId
   } catch (error) {
+    if (beginWechatAuthIfNeeded(error)) return
     errorMessage.value = toMessage(error)
   } finally {
     loading.value = false
@@ -76,18 +76,24 @@ async function handleDraw() {
   } catch (error) {
     window.clearInterval(timer)
     activePrizeId.value = null
+    if (beginWechatAuthIfNeeded(error)) return
     errorMessage.value = toMessage(error)
   } finally {
     spinning.value = false
   }
 }
 
+function beginWechatAuthIfNeeded(error: unknown): boolean {
+  if (identityMode !== 'wechat') return false
+  if (!(error instanceof ApiError) || error.code !== 'IDENTITY_REQUIRED') return false
+
+  const returnTo = `${window.location.pathname}${window.location.search}` || '/'
+  window.location.replace(`/auth/wechat?returnTo=${encodeURIComponent(returnTo)}`)
+  return true
+}
+
 function resolveIdentity(): string {
-  if (identityMode !== 'dev') {
-    const injected = (window as Window & { __LUCKY_OPENID__?: string }).__LUCKY_OPENID__
-    if (injected) return injected
-    return 'wechat-session-required'
-  }
+  if (identityMode !== 'dev') return ''
 
   const key = `lucky-draw:${activitySlug}:dev-openid`
   const existing = window.localStorage.getItem(key)
