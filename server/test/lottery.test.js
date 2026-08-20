@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createDatabase } from '../src/db.js'
-import { getAdminStats, listDraws } from '../src/admin.js'
+import { exportDrawsCsv, getAdminStats, listDraws } from '../src/admin.js'
 import { drawPrize, getActivity, LotteryError } from '../src/lottery.js'
 
 test('同一用户只能消耗一次奖品', () => {
@@ -64,6 +64,21 @@ test('后台统计与中奖记录保持一致并隐藏完整 openid', () => {
     assert.equal(records.length, 2)
     assert.match(records[0].openid, /^openi…000[12]$/)
     assert.equal(records.some((item) => item.openid === 'openid-demo-user-0001'), false)
+  } finally {
+    db.close()
+  }
+})
+
+test('CSV 导出包含中文表头、中奖记录并保持 openid 脱敏', () => {
+  const db = createDatabase(':memory:')
+  try {
+    drawPrize(db, 'demo', 'openid-export-user-0001')
+    const csv = exportDrawsCsv(db, 'demo')
+
+    assert.equal(csv.startsWith('\uFEFF记录ID,中奖时间,微信用户,奖项,奖品'), true)
+    assert.match(csv, /openi…0001/)
+    assert.equal(csv.includes('openid-export-user-0001'), false)
+    assert.equal(csv.split('\r\n').length, 2)
   } finally {
     db.close()
   }
