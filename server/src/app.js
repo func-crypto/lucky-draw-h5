@@ -3,6 +3,19 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { getActivity, getMyResult, drawPrize, LotteryError } from './lottery.js'
 import { exportDrawsCsv, getAdminStats, listDraws } from './admin.js'
+import {
+  buildWechatAuthorizeUrl,
+  createOAuthState,
+  createUserSession,
+  exchangeWechatCode,
+  getIdentityMode,
+  getWechatConfig,
+  readUserSession,
+  sanitizeReturnTo,
+  setUserSessionCookie,
+  validateWechatConfig,
+  verifyOAuthState,
+} from './wechat-auth.js'
 
 const defaultH5Dist = fileURLToPath(new URL('../../h5/dist', import.meta.url))
 
@@ -12,7 +25,52 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
   app.use(express.json({ limit: '32kb' }))
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true })
+    res.json({ ok: true, identityMode: getIdentityMode() })
+  })
+
+  app.get('/auth/wechat', (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store')
+      const config = requireWechatConfig()
+      const returnTo = sanitizeReturnTo(req.query.returnTo)
+      const redirectUri = new URL('/auth/wechat/callback', config.publicBaseUrl).toString()
+      const state = createOAuthState(returnTo, config.sessionSecret)
+      return res.redirect(buildWechatAuthorizeUrl({ appId: config.appId, redirectUri, state }))
+    } catch (error) {
+      return next(error)
+    }
+  })
+
+  app.get('/auth/wechat/callback', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store')
+      const config = requireWechatConfig()
+      const code = String(req.query.code || '').trim()
+      const state = verifyOAuthState(String(req.query.state || ''), config.sessionSecret)
+
+      if (!code || !state) {
+        throw new LotteryError('WECHAT_AUTH_INVALID', '微信授权已失效，请重新进入活动', 400)
+      }
+
+      let openid
+      try {
+        openid = await exchangeWechatCode({
+          appId: config.appId,
+          appSecret: config.appSecret,
+          code,
+        })
+      } catch (error) {
+        console.error('WeChat OAuth exchange failed:', error)
+        throw new LotteryError('WECHAT_AUTH_FAILED', '微信授权失败，请重新进入活动', 502)
+      }
+
+      const token = createUserSession(openid, config.sessionSecret)
+      const secure = new URL(config.publicBaseUrl).protocol === 'https:'
+      setUserSessionCookie(res, token, secure)
+      return res.redirect(state.returnTo)
+    } catch (error) {
+      return next(error)
+    }
   })
 
   app.get('/api/v1/activities/:slug', (req, res) => {
@@ -89,7 +147,7 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
   if (existsSync(h5Dist)) {
     app.use(express.static(h5Dist))
     app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api/')) return next()
+      if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next()
       return res.sendFile(`${h5Dist}/index.html`)
     })
   }
@@ -111,12 +169,42 @@ export function createApp({ db, h5Dist = process.env.H5_DIST || defaultH5Dist })
 }
 
 function requireIdentity(req) {
-  // 开发阶段使用请求头模拟 OpenID；正式微信 OAuth 接入时只替换这里的身份来源。
-  const openid = req.get('X-User-OpenId')?.trim()
-  if (!openid) {
-    throw new LotteryError('IDENTITY_REQUIRED', '请先完成微信身份授权', 401)
+  const mode = getIdentityMode()
+
+  if (mode === 'dev') {
+    const openid = req.get('X-User-OpenId')?.trim()
+    if (!openid) {
+      throw new LotteryError('IDENTITY_REQUIRED', '请先完成微信身份授权', 401)
+    }
+    return openid
   }
-  return openid
+
+  if (mode === 'wechat') {
+    const config = requireWechatConfig()
+    const session = readUserSession(req.get('cookie'), config.sessionSecret)
+    if (!session?.openid) {
+      throw new LotteryError('IDENTITY_REQUIRED', '请先完成微信身份授权', 401)
+    }
+    return session.openid
+  }
+
+  throw new LotteryError('IDENTITY_MODE_INVALID', '身份模式配置错误', 500)
+}
+
+function requireWechatConfig() {
+  const config = getWechatConfig()
+  const missing = validateWechatConfig(config)
+  if (missing.length) {
+    throw new LotteryError('WECHAT_NOT_CONFIGURED', `微信授权尚未配置：${missing.join(', ')}`, 503)
+  }
+
+  try {
+    new URL(config.publicBaseUrl)
+  } catch {
+    throw new LotteryError('WECHAT_NOT_CONFIGURED', 'PUBLIC_BASE_URL 配置无效', 503)
+  }
+
+  return config
 }
 
 function requireAdmin(req) {
