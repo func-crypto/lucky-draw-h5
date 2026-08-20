@@ -8,17 +8,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T | null> {
   if (response.status === 204) return null
 
   if (!response.ok) {
-    let message = `请求失败 (${response.status})`
-    try {
-      const payload = await response.json()
-      message = payload.message || payload.detail || message
-    } catch {
-      // Keep fallback message when the response is not JSON.
-    }
-    throw new Error(message)
+    throw new Error(await responseMessage(response))
   }
 
   return response.json() as Promise<T>
+}
+
+async function responseMessage(response: Response): Promise<string> {
+  let message = `请求失败 (${response.status})`
+  try {
+    const payload = await response.json()
+    message = payload.message || payload.detail || message
+  } catch {
+    // Keep fallback message when the response is not JSON.
+  }
+  return message
 }
 
 export async function getActivity(): Promise<ActivityView> {
@@ -55,4 +59,14 @@ export async function getAdminDraws(adminKey: string): Promise<AdminDrawRecord[]
     headers: { 'X-Admin-Key': adminKey },
   })
   return data?.items || []
+}
+
+export async function getAdminDrawsCsv(adminKey: string): Promise<Blob> {
+  const response = await fetch(`${apiBase}/api/admin/${activitySlug}/draws.csv`, {
+    headers: { 'X-Admin-Key': adminKey },
+  })
+  if (!response.ok) {
+    throw new Error(await responseMessage(response))
+  }
+  return response.blob()
 }
