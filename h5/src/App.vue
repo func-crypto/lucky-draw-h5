@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import AdminView from './AdminView.vue'
 import { activitySlug, drawPrize, getActivity, getMyResult } from './api'
 import type { ActivityView, DrawResult, PrizeView } from './types'
 
+const isAdmin = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
 const activity = ref<ActivityView | null>(null)
 const result = ref<DrawResult | null>(null)
-const loading = ref(true)
+const loading = ref(!isAdmin)
 const spinning = ref(false)
 const activePrizeId = ref<number | null>(null)
 const errorMessage = ref('')
@@ -13,7 +15,7 @@ const showRules = ref(false)
 
 const identityMode = import.meta.env.VITE_IDENTITY_MODE || 'dev'
 const isDevIdentity = identityMode === 'dev'
-const openid = resolveIdentity()
+const openid = isAdmin ? '' : resolveIdentity()
 
 const canDraw = computed(() =>
   !!activity.value &&
@@ -29,6 +31,8 @@ const remainingText = computed(() => {
 })
 
 onMounted(async () => {
+  if (isAdmin) return
+
   try {
     activity.value = await getActivity()
     result.value = await getMyResult(openid)
@@ -109,7 +113,9 @@ function toMessage(error: unknown): string {
 </script>
 
 <template>
-  <main class="page-shell">
+  <AdminView v-if="isAdmin" />
+
+  <main v-else class="page-shell">
     <section class="hero">
       <p class="eyebrow">LUCKY DRAW · 现场有礼</p>
       <h1>{{ activity?.name || '幸运现场抽奖' }}</h1>
