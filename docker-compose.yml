@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: lucky-draw-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: lucky_draw
+      MYSQL_USER: lucky
+      MYSQL_PASSWORD: lucky
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - lucky-draw-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  lucky-draw-mysql:
