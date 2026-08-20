@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getAdminDraws, getAdminStats } from './api'
 import type { AdminDrawRecord, AdminStats } from './types'
 
@@ -10,6 +10,8 @@ const stats = ref<AdminStats | null>(null)
 const draws = ref<AdminDrawRecord[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
+const previousBodyBackground = document.body.style.background
+const previousBodyPadding = document.body.style.padding
 
 const progress = computed(() => {
   if (!stats.value || stats.value.totalStock <= 0) return 0
@@ -17,7 +19,14 @@ const progress = computed(() => {
 })
 
 onMounted(() => {
+  document.body.style.background = '#f5eee5'
+  document.body.style.padding = '0'
   if (adminKey.value) void loadDashboard()
+})
+
+onUnmounted(() => {
+  document.body.style.background = previousBodyBackground
+  document.body.style.padding = previousBodyPadding
 })
 
 async function login() {
