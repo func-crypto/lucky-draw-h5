@@ -59,13 +59,38 @@ export function listDraws(db, slug, limit = 200) {
     WHERE a.slug = ?
     ORDER BY d.id DESC
     LIMIT ?
-  `).all(slug, safeLimit).map((row) => ({
+  `).all(slug, safeLimit).map(toAdminDraw)
+}
+
+export function exportDrawsCsv(db, slug) {
+  const rows = listDraws(db, slug, 500)
+  const header = ['记录ID', '中奖时间', '微信用户', '奖项', '奖品']
+  const lines = rows.map((row) => [
+    row.drawId,
+    row.drawnAt,
+    row.openid,
+    row.prizeLevel,
+    row.prizeName,
+  ])
+
+  // UTF-8 BOM makes Chinese headers open correctly in desktop Excel.
+  return `\uFEFF${[header, ...lines].map((row) => row.map(csvCell).join(',')).join('\r\n')}`
+}
+
+function toAdminDraw(row) {
+  return {
     drawId: row.draw_id,
     openid: maskOpenId(row.openid),
     prizeLevel: row.prize_level,
     prizeName: row.prize_name,
     drawnAt: row.drawn_at,
-  }))
+  }
+}
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  if (!/[",\r\n]/.test(text)) return text
+  return `"${text.replaceAll('"', '""')}"`
 }
 
 function maskOpenId(openid) {
