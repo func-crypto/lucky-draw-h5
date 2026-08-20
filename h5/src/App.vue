@@ -30,6 +30,13 @@ const remainingText = computed(() => {
   return `${activity.value.remainingStock} / ${activity.value.totalStock}`
 })
 
+const activityNotice = computed(() => {
+  if (!activity.value || result.value) return ''
+  if (activity.value.status !== 'ACTIVE') return '活动暂未开放或已经结束，当前不可继续抽奖。'
+  if (activity.value.remainingStock <= 0) return '本次活动奖品已全部抽完，感谢您的参与。'
+  return ''
+})
+
 onMounted(async () => {
   if (isAdmin) return
 
@@ -152,6 +159,10 @@ function toMessage(error: unknown): string {
         </div>
       </section>
 
+      <section v-if="activityNotice" class="panel state-panel activity-notice">
+        <strong>{{ activityNotice }}</strong>
+      </section>
+
       <section class="panel lottery-panel">
         <div class="panel-heading">
           <div>
@@ -193,6 +204,7 @@ function toMessage(error: unknown): string {
           @click="handleDraw"
         >
           <span v-if="spinning">好运正在揭晓…</span>
+          <span v-else-if="activity.status !== 'ACTIVE'">活动暂不可参与</span>
           <span v-else-if="activity.remainingStock <= 0">奖品已全部抽完</span>
           <span v-else>立即抽奖</span>
         </button>
