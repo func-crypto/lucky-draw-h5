@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'agent/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  server-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install server dependencies
+        run: npm install --no-audit --no-fund
+      - name: Test lottery core
+        run: npm test
+
+  h5-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: h5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install H5 dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build H5
+        run: npm run build

@@ -1,0 +1,22 @@
+# Node
+node_modules/
+h5/dist/
+
+# Runtime data
+server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Local env
+.env
+.env.local
+h5/.env.local
+h5/.env.production
+
+# Logs / IDE / OS
+*.log
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+{
+  "name": "lucky-draw-h5-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix h5 install",
+    "build": "npm --prefix h5 run build",
+    "test": "npm --prefix server test && npm --prefix h5 run build",
+    "start": "npm --prefix server start",
+    "start:env": "npm --prefix server run start:env"
+  }
+}
