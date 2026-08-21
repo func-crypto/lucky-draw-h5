@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import AdminView from './AdminView.vue'
-import { ApiError, activitySlug, drawPrize, getActivity, getMyResult, identityMode } from './api'
+import { activitySlug, drawPrize, getActivity, getMyResult } from './api'
 import type { ActivityView, DrawResult, PrizeView } from './types'
 
 const isAdmin = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
@@ -13,8 +13,7 @@ const activePrizeId = ref<number | null>(null)
 const errorMessage = ref('')
 const showRules = ref(false)
 
-const isDevIdentity = identityMode === 'dev'
-const openid = isAdmin ? '' : resolveIdentity()
+const visitorId = isAdmin ? '' : resolveVisitorId()
 
 const canDraw = computed(() =>
   !!activity.value &&
@@ -41,10 +40,9 @@ onMounted(async () => {
 
   try {
     activity.value = await getActivity()
-    result.value = await getMyResult(openid)
+    result.value = await getMyResult(visitorId)
     if (result.value) activePrizeId.value = result.value.prizeId
   } catch (error) {
-    if (beginWechatAuthIfNeeded(error)) return
     errorMessage.value = toMessage(error)
   } finally {
     loading.value = false
@@ -66,7 +64,7 @@ async function handleDraw() {
 
   try {
     const [drawResult] = await Promise.all([
-      drawPrize(openid),
+      drawPrize(visitorId),
       delay(1800),
     ])
     window.clearInterval(timer)
@@ -76,34 +74,33 @@ async function handleDraw() {
   } catch (error) {
     window.clearInterval(timer)
     activePrizeId.value = null
-    if (beginWechatAuthIfNeeded(error)) return
     errorMessage.value = toMessage(error)
   } finally {
     spinning.value = false
   }
 }
 
-function beginWechatAuthIfNeeded(error: unknown): boolean {
-  if (identityMode !== 'wechat') return false
-  if (!(error instanceof ApiError) || error.code !== 'IDENTITY_REQUIRED') return false
+function resolveVisitorId(): string {
+  const key = `lucky-draw:${activitySlug}:visitor-id`
 
-  const returnTo = `${window.location.pathname}${window.location.search}` || '/'
-  window.location.replace(`/auth/wechat?returnTo=${encodeURIComponent(returnTo)}`)
-  return true
-}
-
-function resolveIdentity(): string {
-  if (identityMode !== 'dev') return ''
-
-  const key = `lucky-draw:${activitySlug}:dev-openid`
-  const existing = window.localStorage.getItem(key)
-  if (existing) return existing
+  try {
+    const existing = window.localStorage.getItem(key)
+    if (existing) return existing
+  } catch {
+    // Some privacy modes may deny localStorage. Fall back to an in-memory id for this page load.
+  }
 
   const random = typeof window.crypto?.randomUUID === 'function'
     ? window.crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const value = `dev-${random}`
-  window.localStorage.setItem(key, value)
+  const value = `visitor-${random}`
+
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // The draw still works for the current page even if persistence is unavailable.
+  }
+
   return value
 }
 
@@ -145,7 +142,6 @@ function toMessage(error: unknown): string {
       <p class="eyebrow">LUCKY DRAW · 现场有礼</p>
       <h1>{{ activity?.name || '幸运现场抽奖' }}</h1>
       <p class="hero-copy">微信扫码 · 每人一次 · 抽奖必中奖</p>
-      <div v-if="isDevIdentity" class="dev-badge">开发预览身份</div>
     </section>
 
     <section v-if="loading" class="panel state-panel">
@@ -197,7 +193,7 @@ function toMessage(error: unknown): string {
         </div>
 
         <div v-if="showRules" class="rules">
-          <p>1. 每个微信账号在本场活动中仅可参与一次。</p>
+          <p>1. 每位参与者限参与一次，系统会记录当前浏览器设备的参与状态。</p>
           <p>2. 每次有效抽奖必中奖，奖品从当前剩余库存中随机产生。</p>
           <p>3. 奖品抽完后不再参与后续抽取。</p>
           <p>4. 中奖后请向现场工作人员出示中奖页面领取实物。</p>
