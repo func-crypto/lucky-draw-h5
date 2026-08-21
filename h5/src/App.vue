@@ -138,15 +138,27 @@ function toMessage(error: unknown): string {
   <AdminView v-if="isAdmin" />
 
   <main v-else class="page-shell">
-    <section class="hero">
-      <p class="eyebrow">LUCKY DRAW · 现场有礼</p>
-      <h1>{{ activity?.name || '幸运现场抽奖' }}</h1>
-      <p class="hero-copy">微信扫码 · 每人一次 · 抽奖必中奖</p>
+    <div class="ambient-cloud cloud-left" />
+    <div class="ambient-cloud cloud-right" />
+
+    <section class="brand-strip" aria-label="主办单位">
+      <span>深圳市机关事务管理局</span>
+      <i />
+      <span>深圳交易集团有限公司</span>
     </section>
 
-    <section v-if="loading" class="panel state-panel">
+    <section class="hero">
+      <p class="hero-overline">公共资源交易知识趣味问答活动</p>
+      <h1>
+        <span>大院小事之</span>
+        <strong>深易有约</strong>
+      </h1>
+      <div class="hero-ribbon">扫码抽奖 · 每人仅有一次抽奖机会</div>
+    </section>
+
+    <section v-if="loading" class="panel state-panel loading-panel">
       <span class="loader" />
-      <p>正在打开幸运奖池…</p>
+      <p>正在开启幸运奖池…</p>
     </section>
 
     <template v-else-if="activity">
@@ -157,7 +169,7 @@ function toMessage(error: unknown): string {
         </div>
         <div>
           <span>参与规则</span>
-          <strong>一人一次</strong>
+          <strong>每人一次</strong>
         </div>
       </section>
 
@@ -168,10 +180,26 @@ function toMessage(error: unknown): string {
       <section class="panel lottery-panel">
         <div class="panel-heading">
           <div>
-            <p class="section-kicker">PRIZE POOL</p>
-            <h2>今日奖池</h2>
+            <p class="section-kicker">LUCKY DRAW</p>
+            <h2>幸运抽奖</h2>
           </div>
-          <button class="text-button" @click="showRules = !showRules">活动规则</button>
+          <button class="text-button" @click="showRules = !showRules">
+            {{ showRules ? '收起规则' : '活动规则' }}
+          </button>
+        </div>
+
+        <div class="lottery-stage" :class="{ spinning }">
+          <div class="stage-ring ring-one" />
+          <div class="stage-ring ring-two" />
+          <div class="gift-box" aria-hidden="true">
+            <div class="gift-bow bow-left" />
+            <div class="gift-bow bow-right" />
+            <div class="gift-knot" />
+            <div class="gift-lid" />
+            <div class="gift-body" />
+            <div class="gift-ribbon" />
+          </div>
+          <p>{{ spinning ? '好运正在揭晓…' : result ? '中奖结果已锁定' : '点击下方按钮开启好运' }}</p>
         </div>
 
         <div class="prize-grid">
@@ -185,8 +213,10 @@ function toMessage(error: unknown): string {
             }"
           >
             <div class="prize-icon">{{ prizeEmoji(prize) }}</div>
-            <span class="prize-level">{{ prize.level }}</span>
-            <strong>{{ prize.name }}</strong>
+            <div class="prize-copy">
+              <span class="prize-level">{{ prize.level }}</span>
+              <strong>{{ prize.name }}</strong>
+            </div>
             <small v-if="prize.remainingStock > 0">剩余 {{ prize.remainingStock }} 份</small>
             <small v-else>已抽完</small>
           </article>
@@ -205,7 +235,7 @@ function toMessage(error: unknown): string {
           :disabled="!canDraw"
           @click="handleDraw"
         >
-          <span v-if="spinning">好运正在揭晓…</span>
+          <span v-if="spinning">正在开奖</span>
           <span v-else-if="activity.status !== 'ACTIVE'">活动暂不可参与</span>
           <span v-else-if="activity.remainingStock <= 0">奖品已全部抽完</span>
           <span v-else>立即抽奖</span>
@@ -215,7 +245,8 @@ function toMessage(error: unknown): string {
       <section v-if="result" class="result-card">
         <p class="result-label">CONGRATULATIONS</p>
         <div class="result-icon">{{ prizeEmoji(result) }}</div>
-        <h2>恭喜中奖！</h2>
+        <h2>恭喜中奖</h2>
+        <p class="result-subtitle">请凭本页面前往现场兑奖处领取奖品</p>
         <div class="result-prize">
           <span>{{ result.prizeLevel }}</span>
           <strong>{{ result.prizeName }}</strong>
@@ -224,7 +255,6 @@ function toMessage(error: unknown): string {
           <span>中奖记录 #{{ result.drawId }}</span>
           <span>{{ formatResultTime(result.drawnAt) }}</span>
         </div>
-        <p class="claim-tip">请向现场工作人员出示本页面领取奖品</p>
         <p v-if="result.replayed" class="replayed-tip">您已经参与过本次活动，这是您的原中奖结果。</p>
       </section>
 
@@ -235,6 +265,12 @@ function toMessage(error: unknown): string {
       <p>{{ errorMessage || '活动暂时无法打开' }}</p>
     </section>
 
-    <footer>LuckyDraw H5 · 现场活动抽奖</footer>
+    <section class="event-meta">
+      <strong>深圳市民中心 B 区负一层</strong>
+      <span>市民中心餐厅前展览区域</span>
+      <span>2026年8月24日 11:30–13:30</span>
+    </section>
+
+    <footer>公共资源交易知识趣味问答活动</footer>
   </main>
 </template>
