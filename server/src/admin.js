@@ -64,7 +64,7 @@ export function listDraws(db, slug, limit = 200) {
 
 export function exportDrawsCsv(db, slug) {
   const rows = listDraws(db, slug, 500)
-  const header = ['记录ID', '中奖时间', '微信用户', '奖项', '奖品']
+  const header = ['记录ID', '中奖时间', '参与标识', '奖项', '奖品']
   const lines = rows.map((row) => [
     row.drawId,
     row.drawnAt,
@@ -80,7 +80,7 @@ export function exportDrawsCsv(db, slug) {
 function toAdminDraw(row) {
   return {
     drawId: row.draw_id,
-    openid: maskOpenId(row.openid),
+    openid: maskIdentity(row.openid),
     prizeLevel: row.prize_level,
     prizeName: row.prize_name,
     drawnAt: row.drawn_at,
@@ -93,8 +93,8 @@ function csvCell(value) {
   return `"${text.replaceAll('"', '""')}"`
 }
 
-function maskOpenId(openid) {
-  if (!openid) return ''
-  if (openid.length <= 10) return openid
-  return `${openid.slice(0, 5)}…${openid.slice(-4)}`
+function maskIdentity(value) {
+  if (!value) return ''
+  if (value.length <= 10) return value
+  return `${value.slice(0, 5)}…${value.slice(-4)}`
 }
