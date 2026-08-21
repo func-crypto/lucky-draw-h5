@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import AdminView from './AdminView.vue'
 import { activitySlug, drawPrize, getActivity, getMyResult } from './api'
 import type { ActivityView, DrawResult, PrizeView } from './types'
@@ -12,6 +12,8 @@ const spinning = ref(false)
 const activePrizeId = ref<number | null>(null)
 const errorMessage = ref('')
 const showRules = ref(false)
+const showCelebration = ref(false)
+const resultCard = ref<HTMLElement | null>(null)
 
 const visitorId = isAdmin ? '' : resolveVisitorId()
 
@@ -32,6 +34,12 @@ const activityNotice = computed(() => {
   if (!activity.value || result.value) return ''
   if (activity.value.status !== 'ACTIVE') return '活动暂未开放或已经结束，当前不可继续抽奖。'
   if (activity.value.remainingStock <= 0) return '本次活动奖品已全部抽完，感谢您的参与。'
+  return ''
+})
+
+const liveMessage = computed(() => {
+  if (spinning.value) return '正在开奖，请稍候'
+  if (result.value) return `恭喜中奖，${result.value.prizeLevel}，${result.value.prizeName}`
   return ''
 })
 
@@ -71,6 +79,14 @@ async function handleDraw() {
     activePrizeId.value = drawResult.prizeId
     result.value = drawResult
     activity.value = await getActivity()
+    showCelebration.value = true
+    triggerSuccessFeedback()
+
+    await nextTick()
+    window.setTimeout(() => {
+      resultCard.value?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' })
+    }, 120)
+    window.setTimeout(() => { showCelebration.value = false }, 2200)
   } catch (error) {
     window.clearInterval(timer)
     activePrizeId.value = null
@@ -78,6 +94,16 @@ async function handleDraw() {
   } finally {
     spinning.value = false
   }
+}
+
+function triggerSuccessFeedback() {
+  if ('vibrate' in navigator) {
+    navigator.vibrate?.([45, 35, 90])
+  }
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 
 function resolveVisitorId(): string {
@@ -141,6 +167,12 @@ function toMessage(error: unknown): string {
     <div class="ambient-cloud cloud-left" />
     <div class="ambient-cloud cloud-right" />
 
+    <div class="sr-live" role="status" aria-live="polite">{{ liveMessage }}</div>
+
+    <div v-if="showCelebration" class="celebration-layer" aria-hidden="true">
+      <i v-for="index in 12" :key="index" :style="{ '--piece': index }" />
+    </div>
+
     <section class="brand-strip" aria-label="主办单位">
       <span>深圳市机关事务管理局</span>
       <i />
@@ -183,7 +215,7 @@ function toMessage(error: unknown): string {
             <p class="section-kicker">LUCKY DRAW</p>
             <h2>幸运抽奖</h2>
           </div>
-          <button class="text-button" @click="showRules = !showRules">
+          <button class="text-button" type="button" @click="showRules = !showRules">
             {{ showRules ? '收起规则' : '活动规则' }}
           </button>
         </div>
@@ -232,7 +264,9 @@ function toMessage(error: unknown): string {
         <button
           v-if="!result"
           class="draw-button"
+          type="button"
           :disabled="!canDraw"
+          :aria-busy="spinning"
           @click="handleDraw"
         >
           <span v-if="spinning">正在开奖</span>
@@ -242,7 +276,8 @@ function toMessage(error: unknown): string {
         </button>
       </section>
 
-      <section v-if="result" class="result-card">
+      <section v-if="result" ref="resultCard" class="result-card result-enter">
+        <div class="result-status"><i />中奖结果已锁定</div>
         <p class="result-label">CONGRATULATIONS</p>
         <div class="result-icon">{{ prizeEmoji(result) }}</div>
         <h2>恭喜中奖</h2>
@@ -254,6 +289,10 @@ function toMessage(error: unknown): string {
         <div class="result-meta">
           <span>中奖记录 #{{ result.drawId }}</span>
           <span>{{ formatResultTime(result.drawnAt) }}</span>
+        </div>
+        <div class="staff-check">
+          <strong>现场出示此页即可</strong>
+          <span>中奖记录已保存，刷新或重新进入不会再次抽奖</span>
         </div>
         <p v-if="result.replayed" class="replayed-tip">您已经参与过本次活动，这是您的原中奖结果。</p>
       </section>
