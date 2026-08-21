@@ -2,50 +2,31 @@ import type { ActivityView, AdminDrawRecord, AdminStats, DrawResult } from './ty
 
 const apiBase = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 export const activitySlug = import.meta.env.VITE_ACTIVITY_SLUG || 'demo'
-export const identityMode = import.meta.env.VITE_IDENTITY_MODE || 'dev'
-
-export class ApiError extends Error {
-  status: number
-  code: string
-
-  constructor(status: number, code: string, message: string) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-    this.code = code
-  }
-}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T | null> {
-  const response = await fetch(`${apiBase}${path}`, {
-    credentials: 'include',
-    ...init,
-  })
+  const response = await fetch(`${apiBase}${path}`, init)
   if (response.status === 204) return null
 
   if (!response.ok) {
-    throw await responseError(response)
+    throw new Error(await responseMessage(response))
   }
 
   return response.json() as Promise<T>
 }
 
-async function responseError(response: Response): Promise<ApiError> {
+async function responseMessage(response: Response): Promise<string> {
   let message = `请求失败 (${response.status})`
-  let code = 'REQUEST_FAILED'
   try {
     const payload = await response.json()
     message = payload.message || payload.detail || message
-    code = payload.code || code
   } catch {
-    // Keep fallback values when the response is not JSON.
+    // Keep fallback message when the response is not JSON.
   }
-  return new ApiError(response.status, code, message)
+  return message
 }
 
-function userHeaders(openid: string): HeadersInit | undefined {
-  if (identityMode !== 'dev') return undefined
-  return { 'X-User-OpenId': openid }
+function visitorHeaders(visitorId: string): HeadersInit {
+  return { 'X-Visitor-Id': visitorId }
 }
 
 export async function getActivity(): Promise<ActivityView> {
@@ -54,16 +35,16 @@ export async function getActivity(): Promise<ActivityView> {
   return data
 }
 
-export async function getMyResult(openid: string): Promise<DrawResult | null> {
+export async function getMyResult(visitorId: string): Promise<DrawResult | null> {
   return request<DrawResult>(`/api/v1/activities/${activitySlug}/me`, {
-    headers: userHeaders(openid),
+    headers: visitorHeaders(visitorId),
   })
 }
 
-export async function drawPrize(openid: string): Promise<DrawResult> {
+export async function drawPrize(visitorId: string): Promise<DrawResult> {
   const data = await request<DrawResult>(`/api/v1/activities/${activitySlug}/draw`, {
     method: 'POST',
-    headers: userHeaders(openid),
+    headers: visitorHeaders(visitorId),
   })
   if (!data) throw new Error('抽奖结果为空')
   return data
@@ -86,11 +67,10 @@ export async function getAdminDraws(adminKey: string): Promise<AdminDrawRecord[]
 
 export async function getAdminDrawsCsv(adminKey: string): Promise<Blob> {
   const response = await fetch(`${apiBase}/api/admin/${activitySlug}/draws.csv`, {
-    credentials: 'include',
     headers: { 'X-Admin-Key': adminKey },
   })
   if (!response.ok) {
-    throw await responseError(response)
+    throw new Error(await responseMessage(response))
   }
   return response.blob()
 }
